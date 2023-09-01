@@ -1,0 +1,40 @@
+[tool.poetry]
+name = "lazy-fields"
+version = "0.1.0"
+description = "Lazy attributes to delay initialization"
+authors = ["Gustavo Cardoso <self.gustavocorrea@gmail.com>"]
+readme = "README.md"
+packages = [{include = "lazyfields"}]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+typing-extensions = {version = "^4.7.1", python = ">3, <3.11"}
+
+[tool.poetry.group.tests.dependencies]
+pytest = "^7.4.0"
+pytest-asyncio = "^0.21.1"
+pytest-cov = "^4.1.0"
+coverage = "^7.3.0"
+
+
+[tool.poetry.group.style.dependencies]
+black = "^23.7.0"
+isort = "^5.12.0"
+autoflake = "^2.2.1"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+addopts = [
+    "--cov=lazyfields/",
+    "--cov-report=html",
+    "--cov-config=.coveragerc",
+    "--no-cov-on-fail",
+    "--cov-fail-under=80",
+    "--nf",
+    "-sv",
+    "--maxfail=1"
+]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
