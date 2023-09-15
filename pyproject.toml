@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "lazy-fields"
-version = "1.0.0"
+version = "1.0.1"
 description = "Lazy attributes to delay initialization"
 authors = ["Gustavo Cardoso <self.gustavocorrea@gmail.com>"]
 readme = "README.md"
@@ -42,7 +42,6 @@ tag_format = "$version"
 version_scheme = "pep440"
 version_provider = "poetry"
 update_changelog_on_bump = true
-major_version_zero = true
 version_files = ["lazyfields/__init__.py:__version__"]
 
 [build-system]
