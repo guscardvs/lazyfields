@@ -11,13 +11,5 @@ __all__ = [
     "force_del",
 ]
 
-from ._lazyfields import (
-    asynclazyfield,
-    dellazy,
-    force_del,
-    force_set,
-    is_initialized,
-    lazy,
-    lazyfield,
-    setlazy,
-)
+from ._lazyfields import (asynclazyfield, dellazy, force_del, force_set,
+                          is_initialized, lazy, lazyfield, setlazy)

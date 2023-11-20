@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from lazyfields import asynclazyfield, dellazy, lazyfield, setlazy
+from lazyfields import asynclazyfield, lazyfield
 
 T = TypeVar("T")
 

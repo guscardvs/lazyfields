@@ -1,12 +1,8 @@
 import functools
 import typing
-from typing import Any
+from collections.abc import Callable
 
-try:
-    from typing import Self
-except ImportError:
-    from typing_extensions import Self
-
+from typing_extensions import Self
 
 T = typing.TypeVar("T")
 SelfT = typing.TypeVar("SelfT")
@@ -50,7 +46,7 @@ class lazyfield(lazy, typing.Generic[SelfT, T]):
     recalculation or computation.
     """
 
-    def __init__(self, func: typing.Callable[[SelfT], T]) -> None:
+    def __init__(self, func: Callable[[SelfT], T]) -> None:
         """
         Initializes the lazy field descriptor.
 
@@ -126,7 +122,7 @@ class asynclazyfield(lazy, typing.Generic[SelfT, T]):
 
     def __init__(
         self,
-        func: typing.Callable[[SelfT], typing.Coroutine[typing.Any, typing.Any, T]],
+        func: Callable[[SelfT], typing.Coroutine[typing.Any, typing.Any, T]],
     ) -> None:
         """
         Initializes the asynclazyfield descriptor.
@@ -192,7 +188,7 @@ class asynclazyfield(lazy, typing.Generic[SelfT, T]):
     @typing.overload
     def __get__(
         self, instance: SelfT, owner
-    ) -> typing.Callable[[], typing.Coroutine[Any, Any, T]]:
+    ) -> Callable[[], typing.Coroutine[typing.Any, typing.Any, T]]:
         ...
 
     @typing.overload
@@ -201,7 +197,7 @@ class asynclazyfield(lazy, typing.Generic[SelfT, T]):
 
     def __get__(
         self, instance: typing.Optional[SelfT], owner=None
-    ) -> typing.Union[typing.Callable[[], typing.Coroutine[Any, Any, T]], Self]:
+    ) -> typing.Union[Callable[[], typing.Coroutine[typing.Any, typing.Any, T]], Self]:
         """
         Get the wrapped asynchronous method or the descriptor itself.
 
@@ -211,7 +207,7 @@ class asynclazyfield(lazy, typing.Generic[SelfT, T]):
 
         Returns:
             Union[
-                typing.Callable[[], typing.Coroutine[Any, Any, T]],
+                Callable[[], typing.Coroutine[Any, Any, T]],
                 Self
             ]: The asynchronous method or the descriptor itself.
         """
@@ -226,7 +222,7 @@ class asynclazyfield(lazy, typing.Generic[SelfT, T]):
         dellazy(instance, self.public_name)
 
 
-def _getlazy(instance: Any, attribute: str) -> lazy:
+def _getlazy(instance: typing.Any, attribute: str) -> lazy:
     """
     Get the lazy descriptor associated with the specified attribute on an instance.
 
@@ -248,7 +244,12 @@ def _getlazy(instance: Any, attribute: str) -> lazy:
     return lazyf
 
 
-def setlazy(instance: Any, attribute: str, value: Any, bypass_setattr: bool = False):
+def setlazy(
+    instance: typing.Any,
+    attribute: str,
+    value: typing.Any,
+    bypass_setattr: bool = False,
+):
     """
     Set the value of a lazy-loaded property on an instance.
 
@@ -267,7 +268,7 @@ def setlazy(instance: Any, attribute: str, value: Any, bypass_setattr: bool = Fa
     setter(instance, lazy.private_name, value)
 
 
-def force_set(instance: Any, attribute: str, value: Any):
+def force_set(instance: typing.Any, attribute: str, value: typing.Any):
     """
     Forcefully set the value of a lazy-loaded property on an instance.
 
@@ -279,7 +280,7 @@ def force_set(instance: Any, attribute: str, value: Any):
     setlazy(instance, attribute, value, bypass_setattr=True)
 
 
-def dellazy(instance: Any, attribute: str, bypass_delattr: bool = False):
+def dellazy(instance: typing.Any, attribute: str, bypass_delattr: bool = False):
     """
     Delete the value of a lazy-loaded property on an instance.
 
@@ -297,7 +298,7 @@ def dellazy(instance: Any, attribute: str, bypass_delattr: bool = False):
     deleter(instance, lazy.private_name)
 
 
-def force_del(instance: Any, attribute: str):
+def force_del(instance: typing.Any, attribute: str):
     """
     Forcefully delete the value of a lazy-loaded property on an instance.
 
@@ -311,6 +312,6 @@ def force_del(instance: Any, attribute: str):
 SENTINEL = object()
 
 
-def is_initialized(instance: Any, attribute: str) -> bool:
+def is_initialized(instance: typing.Any, attribute: str) -> bool:
     lazyf = _getlazy(instance, attribute)
     return getattr(instance, lazyf.private_name, SENTINEL) is not SENTINEL
