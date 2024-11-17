@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from lazyfields import asynclazyfield, lazyfield
+from lazyfields import asynclater, later
 
 T = TypeVar("T")
 
@@ -13,7 +13,7 @@ class Fake(Generic[T]):
     def __init__(self, slow_func: Callable[[], T]) -> None:
         self._slow_func = slow_func
 
-    @lazyfield
+    @later
     def test(self) -> T:
         return self._slow_func()
 
@@ -28,7 +28,7 @@ class AsyncFake(Generic[T]):
     def __init__(self, slow_func: Callable[[], Coroutine[Any, Any, T]]) -> None:
         self._slow_func = slow_func
 
-    @asynclazyfield
+    @asynclater
     async def test(self) -> T:
         return await self._slow_func()
 

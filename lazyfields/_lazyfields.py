@@ -1,3 +1,4 @@
+import contextlib
 import functools
 import typing
 from collections.abc import Callable
@@ -46,13 +47,20 @@ class lazyfield(lazy, typing.Generic[SelfT, T]):
     recalculation or computation.
     """
 
-    def __init__(self, func: Callable[[SelfT], T]) -> None:
+    def __init__(
+        self,
+        func: Callable[[SelfT], T],
+        lock: typing.ContextManager = contextlib.nullcontext(),
+    ) -> None:
         """
         Initializes the lazy field descriptor.
 
         Args:
-            func (callable): The function that will be decorated."""
+            func (callable): The function that will be decorated.
+            lock (ContextManager): A context manager that will be used to acquire a lock before accessing the attribute.
+        """
         self._func = func
+        self._lock = lock
 
     def __set_name__(self, owner: type[SelfT], name: str):
         """
@@ -65,12 +73,10 @@ class lazyfield(lazy, typing.Generic[SelfT, T]):
         self.private_name = self._make_private(name)
 
     @typing.overload
-    def __get__(self, instance: SelfT, owner: type[SelfT]) -> T:
-        ...
+    def __get__(self, instance: SelfT, owner: type[SelfT]) -> T: ...
 
     @typing.overload
-    def __get__(self, instance: typing.Literal[None], owner: type[SelfT]) -> Self:
-        ...
+    def __get__(self, instance: typing.Literal[None], owner: type[SelfT]) -> Self: ...
 
     def __get__(
         self,
@@ -79,17 +85,21 @@ class lazyfield(lazy, typing.Generic[SelfT, T]):
     ) -> typing.Union[T, Self]:
         if not instance:
             return self
-        try:
-            val = typing.cast(
-                T,
-                _obj_getattr(
-                    instance,
-                    self.private_name,
-                ),
-            )
-        except AttributeError:
-            val = self._try_set(instance)
-        return val
+        return self._do_get(instance)
+
+    def _do_get(self, instance: SelfT) -> T:
+        with self._lock:
+            try:
+                val = typing.cast(
+                    T,
+                    _obj_getattr(
+                        instance,
+                        self.private_name,
+                    ),
+                )
+            except AttributeError:
+                val = self._try_set(instance)
+            return val
 
     def _try_set(self, instance: SelfT) -> T:
         try:
@@ -102,10 +112,12 @@ class lazyfield(lazy, typing.Generic[SelfT, T]):
             return result
 
     def __set__(self, instance: SelfT, value: T):
-        setlazy(instance, self.public_name, value)
+        with self._lock:
+            setlazy(instance, self.public_name, value)
 
     def __delete__(self, instance: SelfT):
-        dellazy(instance, self.public_name)
+        with self._lock:
+            dellazy(instance, self.public_name)
 
 
 class asynclazyfield(lazy, typing.Generic[SelfT, T]):
@@ -123,6 +135,7 @@ class asynclazyfield(lazy, typing.Generic[SelfT, T]):
     def __init__(
         self,
         func: Callable[[SelfT], typing.Coroutine[typing.Any, typing.Any, T]],
+        lock: typing.AsyncContextManager = contextlib.nullcontext(),
     ) -> None:
         """
         Initializes the asynclazyfield descriptor.
@@ -130,6 +143,7 @@ class asynclazyfield(lazy, typing.Generic[SelfT, T]):
         Args:
             func (callable): The asynchronous function that will be decorated."""
         self._func = func
+        self._lock = lock
 
     def __set_name__(self, owner: type[SelfT], name: str):
         """
@@ -152,17 +166,18 @@ class asynclazyfield(lazy, typing.Generic[SelfT, T]):
         Returns:
             T: The loaded value of the attribute.
         """
-        try:
-            val = typing.cast(
-                T,
-                _obj_getattr(
-                    instance,
-                    self.private_name,
-                ),
-            )
-        except AttributeError:
-            val = await self._try_set(instance)
-        return val
+        async with self._lock:
+            try:
+                val = typing.cast(
+                    T,
+                    _obj_getattr(
+                        instance,
+                        self.private_name,
+                    ),
+                )
+            except AttributeError:
+                val = await self._try_set(instance)
+            return val
 
     async def _try_set(self, instance: SelfT) -> T:
         """
@@ -188,12 +203,10 @@ class asynclazyfield(lazy, typing.Generic[SelfT, T]):
     @typing.overload
     def __get__(
         self, instance: SelfT, owner
-    ) -> Callable[[], typing.Coroutine[typing.Any, typing.Any, T]]:
-        ...
+    ) -> Callable[[], typing.Coroutine[typing.Any, typing.Any, T]]: ...
 
     @typing.overload
-    def __get__(self, instance: typing.Literal[None], owner) -> Self:
-        ...
+    def __get__(self, instance: typing.Literal[None], owner) -> Self: ...
 
     def __get__(
         self, instance: typing.Optional[SelfT], owner=None
@@ -315,3 +328,100 @@ SENTINEL = object()
 def is_initialized(instance: typing.Any, attribute: str) -> bool:
     lazyf = _getlazy(instance, attribute)
     return getattr(instance, lazyf.private_name, SENTINEL) is not SENTINEL
+
+
+@typing.overload
+def later(
+    func: None = None,
+    /,
+    *,
+    lock: typing.ContextManager = contextlib.nullcontext(),
+) -> Callable[[Callable[[SelfT], T]], lazyfield[SelfT, T]]: ...
+
+
+@typing.overload
+def later(
+    func: Callable[[SelfT], T],
+    /,
+    *,
+    lock: typing.ContextManager = contextlib.nullcontext(),
+) -> lazyfield[SelfT, T]: ...
+
+
+def later(
+    func: Callable[[SelfT], T] | None = None,
+    /,
+    *,
+    lock: typing.ContextManager = contextlib.nullcontext(),
+) -> lazyfield[SelfT, T] | Callable[[Callable[[SelfT], T]], lazyfield[SelfT, T]]:
+    """
+    A decorator that can be used to mark a method as a lazy field.
+
+    Args:
+        func (Callable[[], T] | None): The function to be decorated.
+        lock_factory (Callable[[], ContextManager]): A factory function for creating a context manager.
+
+    Returns:
+        lazyfield[T] | Callable[[Callable[[], T], lazyfield[T]]: The decorated function or a decorator that can be used to decorate another function.
+    """
+    if func is not None:
+        return lazyfield(func, lock)
+
+    def decorator(func: Callable[[SelfT], T]) -> lazyfield[SelfT, T]:
+        return lazyfield(func, lock)
+
+    return decorator
+
+
+@typing.overload
+def asynclater(
+    func: None = None,
+    /,
+    *,
+    lock: typing.AsyncContextManager = contextlib.nullcontext(),
+) -> Callable[
+    [Callable[[SelfT], typing.Coroutine[typing.Any, typing.Any, T]]],
+    asynclazyfield[SelfT, T],
+]: ...
+
+
+@typing.overload
+def asynclater(
+    func: Callable[[SelfT], typing.Coroutine[typing.Any, typing.Any, T]],
+    /,
+    *,
+    lock: typing.AsyncContextManager = contextlib.nullcontext(),
+) -> asynclazyfield[SelfT, T]: ...
+
+
+def asynclater(
+    func: Callable[[SelfT], typing.Coroutine[typing.Any, typing.Any, T]] | None = None,
+    /,
+    *,
+    lock: typing.AsyncContextManager = contextlib.nullcontext(),
+) -> (
+    asynclazyfield[SelfT, T]
+    | Callable[
+        [Callable[[SelfT], typing.Coroutine[typing.Any, typing.Any, T]]],
+        asynclazyfield[SelfT, T],
+    ]
+):
+    """
+    A decorator that can be used to mark a method as an async lazy field.
+
+    Args:
+        func (Callable[[], typing.Coroutine[Any, Any, T]] | None): The function to be decorated.
+        lock_factory (Callable[[], AsyncContextManager]): A factory function for creating an async context manager.
+
+    Returns:
+        asynclazyfield[T] | Callable[[Callable[[], typing.Coroutine[Any, Any, T]], asynclazyfield[T]]: The decorated function or a decorator that can be used to decorate another function.
+    """
+    if func is not None:
+        return asynclazyfield(func, lock)
+
+    def decorator(
+        func: Callable[[SelfT], typing.Coroutine[typing.Any, typing.Any, T]],
+    ) -> asynclazyfield[SelfT, T]:
+        return asynclazyfield(func, lock)
+
+    return decorator

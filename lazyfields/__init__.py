@@ -9,7 +9,19 @@ __all__ = [
     "is_initialized",
     "force_set",
     "force_del",
+    "later",
+    "asynclater",
 ]
 
-from ._lazyfields import (asynclazyfield, dellazy, force_del, force_set,
-                          is_initialized, lazy, lazyfield, setlazy)
+from ._lazyfields import (
+    asynclater,
+    asynclazyfield,
+    dellazy,
+    force_del,
+    force_set,
+    is_initialized,
+    later,
+    lazy,
+    lazyfield,
+    setlazy,
+)
