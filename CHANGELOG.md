@@ -1,3 +1,9 @@
+## 1.1.1 (2025-01-02)
+
+### Fix
+
+- added make_lazy_descriptor and getname, lazyfield raises errors at class creation
+
 ## 1.1.0 (2024-11-17)
 
 ### Feat
