@@ -35,6 +35,30 @@ class lazy:
             str: The generated private attribute name."""
         return f"_lazyfield_{public_name}"
 
+    def __set_name__(self, owner: type[SelfT], name: str):
+        """
+        Sets the public and private names for the lazy field descriptor.
+
+        Args:
+            owner (type): The class that owns the descriptor.
+            name (str): The name of the attribute."""
+        self.public_name = name
+        self.private_name = self._make_private(name)
+        self._validate_slots(owner)
+
+    def _validate_slots(self, owner: type):
+        if not is_slotted(owner):
+            # Some stdlib base classes define an empty slots
+            # sequence for some reason
+            return
+        if self.private_name not in owner.__slots__:
+            raise InvalidField(
+                f"Field {self.public_name}'s private attribute is not included in the class's slots.",
+                self.public_name,
+                self.private_name,
+                owner,
+            )
+
 
 class lazyfield(lazy, typing.Generic[SelfT, T]):
     """
@@ -61,16 +85,6 @@ class lazyfield(lazy, typing.Generic[SelfT, T]):
         """
         self._func = func
         self._lock = lock
-
-    def __set_name__(self, owner: type[SelfT], name: str):
-        """
-        Sets the public and private names for the lazy field descriptor.
-
-        Args:
-            owner (type): The class that owns the descriptor.
-            name (str): The name of the attribute."""
-        self.public_name = name
-        self.private_name = self._make_private(name)
 
     @typing.overload
     def __get__(self, instance: SelfT, owner: type[SelfT]) -> T: ...
@@ -144,17 +158,6 @@ class asynclazyfield(lazy, typing.Generic[SelfT, T]):
             func (callable): The asynchronous function that will be decorated."""
         self._func = func
         self._lock = lock
-
-    def __set_name__(self, owner: type[SelfT], name: str):
-        """
-        Set the public and private names for the asynclazyfield descriptor.
-
-        Args:
-            owner (type): The class that owns the descriptor.
-            name (str): The name of the attribute.
-        """
-        self.public_name = name
-        self.private_name = self._make_private(name)
 
     async def __call__(self, instance: SelfT) -> T:
         """
@@ -425,3 +428,61 @@ def asynclater(
         return asynclazyfield(func, lock)
 
     return decorator
+
+
+def make_lazy_descriptor(
+    func: Callable[[SelfT], T],
+) -> Callable[[], lazyfield[SelfT, T]]:
+    """
+    Creates a partial function for creating a lazy field descriptor.
+
+    Args:
+        func (Callable[[SelfT], T]): The function that will be wrapped by the lazy descriptor.
+
+    Returns:
+        Callable[[], lazyfield[SelfT, T]]: A function that when called returns a lazyfield descriptor
+        wrapping the input function.
+    """
+    return functools.partial(lazyfield, func)
+
+
+def getname(name: str):
+    """
+    Get the private name for a lazy field based on the input name.
+
+    Args:
+        name (str): The public name of the lazy field.
+
+    Returns:
+        str: The generated private name.
+    """
+    return lazy._make_private(name)
+
+
+def is_slotted(anything: type):
+    """
+    Determines if a class or type is slotted (i.e., has a __slots__ attribute).
+
+    A class is considered slotted if it defines the __slots__ attribute,
+    which is used to limit the attributes that instances of the class can have.
+    This method checks for the presence of __slots__ in the class itself or its
+    base classes in the method resolution order (MRO).
+
+    Args:
+        anything (type): The class or type to check.
+
+    Returns:
+        bool: True if the class is slotted, False otherwise.
+
+    Notes:
+        - A class with an empty __slots__ tuple is not considered slotted.
+        - This function may have limitations in edge cases with certain base classes
+          like `typing.Generic` that define __slots__ but don't function as slotted
+          classes in the typical sense.
+    """
+    if not hasattr(anything, "__slots__"):
+        return False
+    if anything.__slots__:
+        return True
+    # Traverse the MRO of the class (excluding the class itself)
+    return not any(hasattr(base, "__slots__") for base in anything.mro()[1:])

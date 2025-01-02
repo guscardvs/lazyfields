@@ -11,6 +11,8 @@ __all__ = [
     "force_del",
     "later",
     "asynclater",
+    "make_lazy_descriptor",
+    "getname",
 ]
 
 from ._lazyfields import (
@@ -19,9 +21,11 @@ from ._lazyfields import (
     dellazy,
     force_del,
     force_set,
+    getname,
     is_initialized,
     later,
     lazy,
     lazyfield,
+    make_lazy_descriptor,
     setlazy,
 )

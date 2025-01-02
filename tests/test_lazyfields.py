@@ -5,6 +5,11 @@ from unittest.mock import Mock
 import pytest
 
 from lazyfields import asynclater, later
+from lazyfields._lazyfields import (
+    getname,
+    lazyfield,
+    make_lazy_descriptor,
+)
 
 T = TypeVar("T")
 
@@ -136,3 +141,81 @@ async def test_async_lazy_field_respects_frozen_in_class():
         fake.test = "world"
     with pytest.raises(FrozenInstanceError):
         del fake.test
+
+
+def test_make_lazydescriptor():
+    @make_lazy_descriptor
+    def generic_func(_):
+        return object()
+
+    class TestA:
+        field = generic_func()
+
+    class TestB:
+        another = generic_func()
+
+    # Ensure each descriptor has its own instance
+    # and the public_name is properly provided
+    assert TestA.field is not TestB.another
+    assert TestA.field.public_name == "field"
+    assert TestB.another.public_name == "another"
+
+    # Ensure original lazyfield behavior is kept
+    original = None
+    test_a = TestA()
+    for _ in range(3):
+        if original is None:
+            original = test_a.field
+        else:
+            assert original is test_a.field
+
+    # Ensure each instance has a different cache management
+    pool_size = 10
+    instance_pool = [TestB() for _ in range(pool_size)]
+    field_set = {item.another for item in instance_pool}
+    assert len(field_set) == pool_size
+
+    # Ensure after all executions in TestB, no change was made to test_a.field
+    assert test_a.field is original
+
+
+def test_lazy_descriptor_no_slots():
+    class NoSlots:
+        @lazyfield
+        def field(self):
+            return None
+
+    instance = NoSlots()
+    instance.field = "value"
+    assert instance.field == "value"
+
+
+def test_lazy_descriptor_with_slots():
+    class WithSlots:
+        __slots__ = (getname("field"),)
+
+        @lazyfield
+        def field(self):
+            return None
+
+    instance = WithSlots()
+    instance.field = "value"
+    assert instance.field == "value"
+
+
+def test_lazy_descriptor_missing_slot():
+    with pytest.raises(
+        RuntimeError,
+    ) as exc_info:
+
+        class MissingSlot:
+            __slots__ = ()
+
+            @lazyfield
+            def field(self):
+                return None
+
+    assert (
+        exc_info.value.__cause__.args[0]  # type: ignore
+        == "Field field's private attribute is not included in the class's slots."
+    )
