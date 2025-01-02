@@ -44,20 +44,6 @@ class lazy:
             name (str): The name of the attribute."""
         self.public_name = name
         self.private_name = self._make_private(name)
-        self._validate_slots(owner)
-
-    def _validate_slots(self, owner: type):
-        if not is_slotted(owner):
-            # Some stdlib base classes define an empty slots
-            # sequence for some reason
-            return
-        if self.private_name not in owner.__slots__:
-            raise InvalidField(
-                f"Field {self.public_name}'s private attribute is not included in the class's slots.",
-                self.public_name,
-                self.private_name,
-                owner,
-            )
 
 
 class lazyfield(lazy, typing.Generic[SelfT, T]):

@@ -201,21 +201,3 @@ def test_lazy_descriptor_with_slots():
     instance = WithSlots()
     instance.field = "value"
     assert instance.field == "value"
-
-
-def test_lazy_descriptor_missing_slot():
-    with pytest.raises(
-        RuntimeError,
-    ) as exc_info:
-
-        class MissingSlot:
-            __slots__ = ()
-
-            @lazyfield
-            def field(self):
-                return None
-
-    assert (
-        exc_info.value.__cause__.args[0]  # type: ignore
-        == "Field field's private attribute is not included in the class's slots."
-    )
