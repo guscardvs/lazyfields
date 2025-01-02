@@ -1,3 +1,9 @@
+## 1.1.2 (2025-01-02)
+
+### Fix
+
+- removed slots check due to incompatibility with defined classes
+
 ## 1.1.1 (2025-01-02)
 
 ### Fix
